@@ -44,6 +44,7 @@ extension View{
 
 @Observable
 class Expenses{
+    var types = [String]()
     var items = [ExpenseItem](){
         didSet{
             if let encodedData = try? JSONEncoder().encode(items){
@@ -55,12 +56,13 @@ class Expenses{
         if let fetchedData = UserDefaults.standard.data(forKey: "Items"){
             if let decodedData = try? JSONDecoder().decode([ExpenseItem].self, from: fetchedData){
                 items = decodedData
+                types = Array(Set(decodedData.map{ $0.type }))
                 return
                 
             }
         }
         items = []
-        
+        types = []
     }
 }
 
@@ -73,29 +75,38 @@ struct ContentView: View {
     var body: some View {
         NavigationStack{
             List{
-                ForEach(expenses.items) { expense in
-                    HStack{
-                        VStack(alignment: .leading){
-                            Text(expense.name)
-                                .font(.headline)
-                            Text(expense.type)
+                ForEach(expenses.types, id: \.self){ type in
+                    Section(type){
+                        var currentItems = expenses.items.filter{ $0.type == type }
+                        
+                        ForEach( currentItems) { expense in
+                            HStack{
+                                VStack(alignment: .leading){
+                                    Text(expense.name)
+                                        .font(.headline)
+                                    Text(expense.type)
+                                }
+                                Spacer()
+                                Text(expense.amount,format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
+                                    .formatExpense(with: expense.amount)
+                            }
                         }
-                        Spacer()
-                        Text(expense.amount,format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
-                            .formatExpense(with: expense.amount)
+                        .onDelete(perform: removeExpense)            }
+                    .navigationTitle("iExpense")
+                    .navigationBarTitleDisplayMode(.large)
+                    
                     }
-                }
-                .onDelete(perform: removeExpense)            }
-            .navigationTitle("iExpense")
-            .navigationBarTitleDisplayMode(.large)
+                   
+                    }
+            .sheet(isPresented: $showingAddExpense) {
+                AddView(expenses: expenses)
+            }
             .toolbar{
                 Button("Add Expense",systemImage: "plus"){
                    showingAddExpense = true
                 }
-            }
-            .sheet(isPresented: $showingAddExpense) {
-                AddView(expenses: expenses)
-            }
+                }
+               
         }
     }
     func removeExpense(at offset: IndexSet){
